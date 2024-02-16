@@ -8,14 +8,24 @@ const app = express();
 const port = 3000;
 
 // Configure Multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/"); // Specify the upload directory
-  },
-  filename: (req, file, cb) => {
-    cb(null, file.originalname); // Use the original file name
-  },
-});
+// const storage = multer.diskStorage({
+//   destination: (req, file, cb) => {
+//     cb(null, "uploads/"); // Specify the upload directory
+//   },
+//   filename: (req, file, cb) => {
+//     cb(null, file.originalname); // Use the original file name
+//   },
+// });
+
+// const storage = multer({ storage: storage });
+
+const createUploadsFolderIfNotExists = (req, res, next) => {
+  const uploadDir = path.join(__dirname, "uploads");
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir);
+  }
+  next();
+};
 
 const cache = {};
 
@@ -42,23 +52,29 @@ function searchInCSV(filename, callback) {
     });
 }
 
+const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-app.post("/", upload.single("inputFile"), (req, res) => {
-  if (!req.file) {
-    return res.status(400).send("No file uploaded.");
-  }
-
-  const filename = path.parse(req.file.filename).name;
-
-  searchInCSV(filename, (results) => {
-    if (results) {
-      res.send(`${filename}:${results}`);
-    } else {
-      res.status(404).send("Results not found for the uploaded file.");
+app.post(
+  "/",
+  createUploadsFolderIfNotExists,
+  upload.single("inputFile"),
+  (req, res) => {
+    if (!req.file) {
+      return res.status(400).send("No file uploaded.");
     }
-  });
-});
+
+    const filename = path.parse(req.file.originalname).name;
+
+    searchInCSV(filename, (results) => {
+      if (results) {
+        res.send(`${filename}:${results}`);
+      } else {
+        res.status(404).send("Results not found for the uploaded file.");
+      }
+    });
+  }
+);
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
